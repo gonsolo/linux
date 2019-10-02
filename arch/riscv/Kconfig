@@ -774,6 +774,12 @@ config RISCV_EFFICIENT_UNALIGNED_ACCESS
 
 endchoice
 
+config RISCV_ROCC
+	bool "Enable RoCC instructions"
+	default y
+        help
+       	  Say N here if you want to disable all non-standard custom instructions
+
 endmenu # "Platform type"
 
 menu "Kernel features"
