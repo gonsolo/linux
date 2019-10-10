@@ -904,6 +904,14 @@ config RANDOMIZE_BASE
 
           If unsure, say N.
 
+config RISCV_TIMEBASE_DIV
+	int "RISC-V timebase divisor"
+	default 1
+	help
+	  Force the kernel to assume that the mtime RTC frequency is an
+	  integer factor slower than reported by the platform.
+	  This makes simulated systems more responsive to user interaction.
+
 endmenu # "Kernel features"
 
 menu "Boot options"
