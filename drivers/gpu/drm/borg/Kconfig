@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config DRM_BORG
+	tristate "Borg (DRM support for Borg GPUs)"
+	depends on DRM
+	depends on MMU
+	select DRM_SCHED
+	select IOMMU_SUPPORT
+	help
+	  DRM driver for Borg GPUs.
