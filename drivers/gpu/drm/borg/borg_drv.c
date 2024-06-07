@@ -1,3 +1,4 @@
+#include <drm/drm_drv.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -5,11 +6,41 @@
 
 #include "borg_device.h"
 
+static const struct drm_driver borg_drm_driver = {
+
+};
+
 static int borg_probe(struct platform_device *pdev)
 {
 	pr_info("Borg probe!");
 
-	return 0;
+        struct borg_device *borg_dev;
+        struct drm_device *drm;
+        int ret = 0;
+
+        borg_dev = devm_drm_dev_alloc(&pdev->dev, &borg_drm_driver,
+                                     struct borg_device, base);
+        if (IS_ERR(borg_dev)) {
+	        pr_info("Borg dev alloc failed!");
+                return -ENOMEM;
+        }
+	pr_info("Borg dev alloc succeeded!");
+
+        drm = &borg_dev->base;
+        platform_set_drvdata(pdev, drm);
+	pr_info("Borg set drvdata ok!");
+
+        ret = drm_dev_register(drm, 0);
+        if (ret < 0) {
+	        pr_info("Borg drm_dev_register failed!");
+                goto err;
+        }
+
+	pr_info("Borg probe ok!");
+        return 0;
+err:
+        platform_set_drvdata(pdev, NULL);
+	return ret;
 }
 
 static void borg_remove(struct platform_device *pdev)
