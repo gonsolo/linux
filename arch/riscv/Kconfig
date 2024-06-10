@@ -759,6 +759,12 @@ config RISCV_EFFICIENT_UNALIGNED_ACCESS
 
 endchoice
 
+config RISCV_ROCC
+	bool "Enable RoCC instructions"
+	default y
+	help
+	  Say N here if you want to disable all non-standard custom instructions
+
 endmenu # "Platform type"
 
 menu "Kernel features"
@@ -881,6 +887,29 @@ config RANDOMIZE_BASE
           location of the kernel Image as well.
 
           If unsure, say N.
+
+config RISCV_TIMEBASE_DIV
+	int "RISC-V timebase divisor"
+	default 1
+	help
+	  Force the kernel to assume that the mtime RTC frequency is an
+	  integer factor slower than reported by the platform.
+	  This makes simulated systems more responsive to user interaction.
+
+config OVERRIDE_RNG_ENTROPY
+        bool "Override rng init entropy with OVERRIDE_RNG_ENTROPY_VALUE"
+        default n
+        help
+          Override the random number generator init entropy during early boot
+          See drivers/char/random.c:random_init_early()
+          This prevents apps from blocking on the rng.
+
+config OVERRIDE_RNG_ENTROPY_VALUE
+        int "Value for rng init entropy"
+        default 256
+        depends on OVERRIDE_RNG_ENTROPY
+        help
+          Default: 256, the minimum required threshold per drivers/char/random.c to initialize the rng
 
 endmenu # "Kernel features"
 
