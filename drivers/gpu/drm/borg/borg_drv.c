@@ -7,7 +7,12 @@
 #include "borg_device.h"
 
 static const struct drm_driver borg_drm_driver = {
-
+        .driver_features        = DRIVER_RENDER,
+        .name                   = "borg",
+        .desc                   = "borg DRM",
+        .date                   = "20240611",
+        .major                  = 1,
+        .minor                  = 0
 };
 
 static int borg_probe(struct platform_device *pdev)
