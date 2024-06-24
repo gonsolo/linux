@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Andreas Wendleder
+ */
+
 #include <drm/drm_drv.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>

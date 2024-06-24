@@ -2,6 +2,8 @@
 
 borg-y := \
 	borg_device.o \
-	borg_drv.o
+	borg_drm.o \
+	borg_drv.o \
+	borg_gem.o
 
 obj-$(CONFIG_DRM_BORG) += borg.o

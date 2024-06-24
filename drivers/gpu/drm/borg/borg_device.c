@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Andreas Wendleder
+ */
+
 #include <linux/device.h>
 #include <linux/pm.h>
 
