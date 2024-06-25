@@ -11,7 +11,7 @@ int
 borg_gem_new(struct borg_cli *cli, u64 size, struct borg_bo **pborgbo)
 {
         // TODO
-        return 0;
+        return -1;
 }
 
 int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
@@ -19,7 +19,7 @@ int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file
         //struct nouveau_cli *cli = nouveau_cli(file_priv);
         //struct drm_nouveau_gem_new *req = data;
         //struct nouveau_bo *nvbo = NULL;
-        int ret = 0;
+        int ret = -1;
 
 
         //ret = borg_gem_new(cli, req->info.size, req->align,
