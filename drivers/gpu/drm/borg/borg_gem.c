@@ -7,13 +7,6 @@
 #include <linux/types.h>
 #include <uapi/drm/borg_drm.h>
 
-int
-borg_gem_new(struct borg_cli *cli, u64 size, struct borg_bo **pborgbo)
-{
-        // TODO
-        return -1;
-}
-
 int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
         //struct nouveau_cli *cli = nouveau_cli(file_priv);
