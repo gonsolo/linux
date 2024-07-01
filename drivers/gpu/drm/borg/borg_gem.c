@@ -4,11 +4,16 @@
 
 #include <drm/drm_device.h>
 #include <drm/drm_file.h>
+
 #include <linux/types.h>
+
 #include <uapi/drm/borg_drm.h>
+
+#include "borg_gem.h"
 
 int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
+        pr_info("Borg: borg_gem_ioctl_new!");
         //struct nouveau_cli *cli = nouveau_cli(file_priv);
         //struct drm_nouveau_gem_new *req = data;
         //struct nouveau_bo *nvbo = NULL;

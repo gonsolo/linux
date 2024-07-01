@@ -3,12 +3,29 @@
  */
 
 #include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_gem.h>
+#include <drm/drm_ioctl.h>
+
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/printk.h>
 
+#include <uapi/drm/borg_drm.h>
+
 #include "borg_device.h"
+#include "borg_gem.h"
+
+static const struct drm_ioctl_desc borg_ioctls[] = {
+        DRM_IOCTL_DEF_DRV(BORG_GEM_NEW, borg_gem_ioctl_new, DRM_RENDER_ALLOW),
+};
+
+static const struct file_operations borg_fops = {
+        .owner = THIS_MODULE,
+        DRM_GEM_FOPS,
+        .show_fdinfo = drm_show_fdinfo,
+};
 
 static const struct drm_driver borg_drm_driver = {
         .driver_features        = DRIVER_RENDER,
@@ -16,7 +33,11 @@ static const struct drm_driver borg_drm_driver = {
         .desc                   = "borg DRM",
         .date                   = "20240611",
         .major                  = 1,
-        .minor                  = 0
+        .minor                  = 0,
+
+        .ioctls                 = borg_ioctls,
+        .num_ioctls             = ARRAY_SIZE(borg_ioctls),
+        .fops                   = &borg_fops,
 };
 
 static int borg_probe(struct platform_device *pdev)

@@ -1,4 +1,5 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
+
 #ifndef __BORG_DRV_H__
 #define __BORG_DRV_H__
 
