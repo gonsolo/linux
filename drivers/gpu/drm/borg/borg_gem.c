@@ -35,11 +35,14 @@ borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_pri
         int ret = -1;
 
         bo = borg_gem_create(dev, req->info.size);
-        if (ret)
-                return ret;
+        if (IS_ERR(bo))
+                  return PTR_ERR(bo);
 
         ret = drm_gem_handle_create(file_priv, &bo->base.base, &req->info.handle);
-
+        if (ret)
+                goto out;
+        // TODO
+out:
         drm_gem_object_put(&bo->base.base);
         return ret;
 }
