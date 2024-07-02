@@ -1,13 +1,13 @@
 /*
-   * Copyright 2024 Andreas Wendleder
-   * All Rights Reserved.
-   *
-   */
+ * Copyright 2024 Andreas Wendleder
+ * All Rights Reserved.
+ *
+ */
 
 #ifndef __BORG_DRM_H__
 #define __BORG_DRM_H__
 
-#include "drm.h" // W: Included header drm.h is not used directly (fix available)
+#include "drm.h"
 
 #if defined(__cplusplus)
 extern "C" {

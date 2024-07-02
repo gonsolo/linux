@@ -15,7 +15,7 @@ int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file
 {
         pr_info("Borg: borg_gem_ioctl_new!");
         //struct nouveau_cli *cli = nouveau_cli(file_priv);
-        //struct drm_nouveau_gem_new *req = data;
+        struct drm_borg_gem_new *req = data;
         //struct nouveau_bo *nvbo = NULL;
         int ret = -1;
 
