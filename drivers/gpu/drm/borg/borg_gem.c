@@ -4,6 +4,7 @@
 
 #include <drm/drm_device.h>
 #include <drm/drm_file.h>
+#include <drm/drm_gem.h>
 
 #include <linux/types.h>
 
@@ -11,31 +12,35 @@
 
 #include "borg_gem.h"
 
-int borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
+struct borg_gem_object* borg_gem_create(struct drm_device* dev, u64 size)
+{
+        struct drm_gem_shmem_object *shmem;
+        struct borg_gem_object *bo;
+
+        shmem = drm_gem_shmem_create(dev, size);
+        if (IS_ERR(shmem))
+                return ERR_CAST(shmem);
+
+        bo = to_borg_bo(&shmem->base);
+
+        return bo;
+}
+
+int
+borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
         pr_info("Borg: borg_gem_ioctl_new!");
-        //struct nouveau_cli *cli = nouveau_cli(file_priv);
         struct drm_borg_gem_new *req = data;
-        //struct nouveau_bo *nvbo = NULL;
+        struct borg_gem_object *bo = NULL;
         int ret = -1;
 
+        bo = borg_gem_create(dev, req->info.size);
+        if (ret)
+                return ret;
 
-        //ret = borg_gem_new(cli, req->info.size, req->align,
-        //                      req->info.domain, req->info.tile_mode,
-        //                      req->info.tile_flags, &nvbo);
-        //if (ret)
-        //        return ret;
+        ret = drm_gem_handle_create(file_priv, &bo->base.base, &req->info.handle);
 
-        //ret = drm_gem_handle_create(file_priv, &nvbo->bo.base,
-        //                            &req->info.handle);
-        //if (ret == 0) {
-        //        ret = nouveau_gem_info(file_priv, &nvbo->bo.base, &req->info);
-        //        if (ret)
-        //                drm_gem_handle_delete(file_priv, req->info.handle);
-        //}
-
-        ///* drop reference from allocate - handle holds it now */
-        //drm_gem_object_put(&nvbo->bo.base);
+        drm_gem_object_put(&bo->base.base);
         return ret;
 }
 

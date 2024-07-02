@@ -3,6 +3,7 @@ config DRM_BORG
 	tristate "Borg Graphics cards"
 	depends on DRM
 	default y
+        select DRM_GEM_SHMEM_HELPER
 	help
 	  Choose this option for open-source Borg Graphics support.
 
