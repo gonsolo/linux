@@ -41,7 +41,10 @@ borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_pri
         ret = drm_gem_handle_create(file_priv, &bo->base.base, &req->info.handle);
         if (ret)
                 goto out;
-        // TODO
+
+        ret = drm_gem_create_mmap_offset(&bo->base.base);
+        if (ret == 0)
+                req->info.map_handle = drm_vma_node_offset_addr(&bo->base.base.vma_node);
 out:
         drm_gem_object_put(&bo->base.base);
         return ret;
