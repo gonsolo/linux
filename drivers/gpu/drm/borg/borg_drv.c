@@ -16,8 +16,11 @@
 
 #include "borg_device.h"
 #include "borg_gem.h"
+#include "borg_uvmm.h"
 
 static const struct drm_ioctl_desc borg_ioctls[] = {
+        DRM_IOCTL_DEF_DRV(BORG_VM_INIT, borg_uvmm_ioctl_vm_init, DRM_RENDER_ALLOW),
+        DRM_IOCTL_DEF_DRV(BORG_VM_BIND, borg_uvmm_ioctl_vm_bind, DRM_RENDER_ALLOW),
         DRM_IOCTL_DEF_DRV(BORG_GEM_NEW, borg_gem_ioctl_new, DRM_RENDER_ALLOW),
 };
 
