@@ -245,6 +245,14 @@ static int __init asids_init(void)
 	mb();
 #endif
 
+#ifdef CONFIG_RISCV_ROCC
+	/*
+	 * Fence to wait for RoCC memory operations to finish, since
+	 * satp is shared between the processor and RoCC accelerators.
+	 */
+	mb();
+#endif
+
 	/* Figure-out number of ASID bits in HW */
 	old = csr_read(CSR_SATP);
 	asid_bits = old | (SATP_ASID_MASK << SATP_ASID_SHIFT);
