@@ -29,7 +29,7 @@ struct borg_gem_object* borg_gem_create(struct drm_device* dev, u64 size)
 int
 borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
-        pr_info("Borg: borg_gem_ioctl_new!");
+        //pr_info("Borg: borg_gem_ioctl_new!");
         struct drm_borg_gem_new *req = data;
         struct borg_gem_object *bo = NULL;
         int ret = -1;
@@ -37,17 +37,17 @@ borg_gem_ioctl_new(struct drm_device *dev, void *data, struct drm_file *file_pri
         bo = borg_gem_create(dev, req->info.size);
         if (IS_ERR(bo))
                   return PTR_ERR(bo);
-        pr_info("Borg: borg_gem_create ok, bo: %p\n", bo);
+        //pr_info("Borg: borg_gem_create ok, bo: %p\n", bo);
         ret = drm_gem_handle_create(file_priv, &bo->base.base, &req->info.handle);
         if (ret)
                 goto out;
-        pr_info("Borg: drm_gem_handle_create ok");
+        //pr_info("Borg: drm_gem_handle_create ok");
 
         ret = drm_gem_create_mmap_offset(&bo->base.base);
         if (ret == 0)
                 req->info.map_handle = drm_vma_node_offset_addr(&bo->base.base.vma_node);
 out:
         drm_gem_object_put(&bo->base.base);
-        pr_info("Borg: borg_gem_ioctl_new returns ret: %i\n", ret);
+        //pr_info("Borg: borg_gem_ioctl_new returns ret: %i\n", ret);
         return ret;
 }
