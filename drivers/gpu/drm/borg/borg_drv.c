@@ -56,10 +56,10 @@ static const struct drm_driver borg_drm_driver = {
         .driver_features        = DRIVER_GEM | DRIVER_RENDER,
         .name                   = "borg",
         .desc                   = "borg DRM",
-        .date                   = "20240611",
-        .major                  = 1,
+        .date                   = "20250128",
+        .major                  = 0,
         .minor                  = 0,
-
+        .patchlevel             = 1,
         .ioctls                 = borg_ioctls,
         .num_ioctls             = ARRAY_SIZE(borg_ioctls),
         .fops                   = &borg_fops,
@@ -67,7 +67,7 @@ static const struct drm_driver borg_drm_driver = {
 
 static int borg_probe(struct platform_device *pdev)
 {
-	pr_info("Borg probe!");
+	pr_info("Borg probe 1!");
 
         struct borg_device *borg_dev;
         struct drm_device *drm;
