@@ -15,35 +15,25 @@
 #include <uapi/drm/borg_drm.h>
 
 #include "borg_device.h"
-#include "borg_drv.h"
 #include "borg_gem.h"
 #include "borg_uvmm.h"
-
-//static inline uint8_t reg_read8(uintptr_t addr)
-//{
-//        volatile uint8_t *ptr = (volatile uint8_t *) addr;
-//        return *ptr;
-//}
 
 static int
 borg_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
-        struct borg_cli *cli = borg_cli(file_priv);
         struct drm_borg_getparam *getparam = data;
 
         switch (getparam->param) {
         case BORG_GETPARAM_STATUS: {
                 __iomem uint32_t *addr = ioremap(0x4000, 0x0);
-                //const int borg_status = 0x4000;
-                BORG_PRINTK(dbg, cli, "attempting to read status\n");
-                //uint64_t status = reg_read8(borg_status) & 0x1;
+                pr_info("Borg: attempting to read status\n");
                 uint64_t status = readl(addr) & 0x1;
-                BORG_PRINTK(dbg, cli, "borg status: %lld\n", status);
+                pr_info("Borg: status: %lld\n", status);
                 getparam->value = status;
                 break;
         }
         default:
-                BORG_PRINTK(dbg, cli, "unknown parameter %lld\n", getparam->param);
+                pr_info("Borg: unknown parameter %lld\n", getparam->param);
                 return -EINVAL;
         }
         return 0;
