@@ -91,6 +91,13 @@ static int borg_probe(struct platform_device *pdev)
                 goto err;
         }
 
+        void __iomem *mmio = devm_platform_ioremap_resource(pdev, 0);
+        if (IS_ERR(mmio)) {
+                pr_info("Borg: mmio failed");
+                return PTR_ERR(mmio);
+        }
+        pr_info("Borg: mmio: %p\n", mmio);
+
 	pr_info("Borg probe ok!");
         return 0;
 err:
