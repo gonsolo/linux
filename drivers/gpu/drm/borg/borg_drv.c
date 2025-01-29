@@ -98,8 +98,10 @@ static int borg_probe(struct platform_device *pdev)
         }
         pr_info("Borg: mmio: %p\n", mmio);
 
-        u32 status = readl(mmio + 0x4000);
-        pr_info("Borg: status register: %i\n", status);
+        u32 test1 = readl(mmio + 0x4000);
+        pr_info("Borg: test1 register: %i\n", test1);
+        u32 test2 = readl(mmio + 0x4020);
+        pr_info("Borg: test2 register: %i\n", test2);
 
 	pr_info("Borg probe ok!");
         return 0;
