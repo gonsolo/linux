@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/printk.h>
+#include <linux/regmap.h>
 
 #include <uapi/drm/borg_drm.h>
 
@@ -65,15 +66,28 @@ static const struct drm_driver borg_drm_driver = {
         .fops                   = &borg_fops,
 };
 
+#define BORG_TEST1      0x4000
+#define BORG_TEST2      0x4020
+
+static const struct regmap_config borg_regmap_config = {
+        .reg_bits       = 32,
+        .val_bits       = 32,
+        .reg_stride     = 4,
+        .max_register   = BORG_TEST2,
+        .name           = "borg-regmap",
+};
+
 static int borg_probe(struct platform_device *pdev)
 {
 	pr_info("Borg probe 1!");
 
         struct borg_device *borg_dev;
         struct drm_device *drm;
+        struct device *dev = &pdev->dev;
+
         int ret = 0;
 
-        borg_dev = devm_drm_dev_alloc(&pdev->dev, &borg_drm_driver,
+        borg_dev = devm_drm_dev_alloc(dev, &borg_drm_driver,
                                      struct borg_device, base);
         if (IS_ERR(borg_dev)) {
 	        pr_info("Borg dev alloc failed!");
@@ -98,9 +112,23 @@ static int borg_probe(struct platform_device *pdev)
         }
         pr_info("Borg: mmio: %p\n", mmio);
 
-        u32 test1 = ioread32(mmio + 0x4000);
+        struct regmap *regs = devm_regmap_init_mmio(dev, mmio, &borg_regmap_config);
+        if (IS_ERR(regs)) {
+                pr_info("Borg: Couldn't create regmap");
+                return PTR_ERR(regs);
+        }
+        pr_info("Borg: regs: %p\n", regs);
+
+        msleep(300);
+
+        u32 test1;
+        regmap_read(regs, BORG_TEST1, &test1);
+        //u32 test1 = ioread32(mmio + 0x4000);
         pr_info("Borg: test1 register: %i\n", test1);
-        u32 test2 = ioread32(mmio + 0x4020);
+
+        //u32 test2 = ioread32(mmio + 0x4020);
+        u32 test2;
+        regmap_read(regs, BORG_TEST2, &test2);
         pr_info("Borg: test2 register: %i\n", test2);
 
 	pr_info("Borg probe ok!");
