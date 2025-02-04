@@ -20,6 +20,15 @@
 #include "borg_gem.h"
 #include "borg_uvmm.h"
 
+#define BORG_TEST1      0x00
+#define BORG_TEST2      0x20
+
+static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
+{
+	return readl(borg_dev->regs + reg);
+}
+
+
 static int
 borg_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
@@ -108,10 +117,10 @@ static int borg_probe(struct platform_device *pdev)
         }
         pr_info("Borg: regs: %p.\n", borg_dev->regs);
 
-        u64 test1 = readq(borg_dev->regs + 0x00);
-        pr_info("Borg: reg0: %lli.\n", test1);
-        u64 test2 = readq(borg_dev->regs + 0x20);
-        pr_info("Borg: reg0: %lli.\n", test2);
+        u32 test1 = borg_gpu_read(borg_dev, BORG_TEST1);
+        pr_info("Borg: test1: %i.\n", test1);
+        u32 test2 = borg_gpu_read(borg_dev, BORG_TEST2);
+        pr_info("Borg: test2: %i.\n", test2);
 
         platform_set_drvdata(pdev, drm);
 	pr_info("Borg set drvdata ok!");
