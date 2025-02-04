@@ -137,10 +137,20 @@ static int borg_probe(struct platform_device *pdev)
         //struct device_node *child = NULL;
 
         struct resource *mem_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-        pr_info("Borg: mem resource: start %lli end %lli name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
+        if (!mem_resource) {
+                pr_info("Borg: Failed mem resource.\n");
+        } else {
+                pr_info("Borg: mem resource: start %i end %i name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
 
-        struct resource *reg_resource = platform_get_resource(pdev, IORESOURCE_REG, 0);
-        pr_info("Borg: reg resource: start %lli end %lli name %s.\n", reg_resource->start, reg_resource->end, reg_resource->name);
+                struct resource *mem = devm_request_mem_region(&pdev->dev, mem_resource->start, resource_size(mem_resource), "borg");
+                if (!mem) {
+                        pr_info("Borg: Failed requst mem region.\n");
+                        // Try raw resource
+                        mem = mem_resource;
+                }
+                void *base = devm_ioremap_wc(&pdev->dev, mem->start, resource_size(mem));
+                pr_info("Borg: base: %p.\n", base);
+        }
 
 #if 0
         pr_info("Borg: for each child:");
