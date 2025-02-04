@@ -133,9 +133,16 @@ static int borg_probe(struct platform_device *pdev)
         pr_info("Borg: test2 register: %i\n", test2);
 #endif
 
-        struct device_node *dev_node = dev->of_node;
-        struct device_node *child = NULL;
+        //struct device_node *dev_node = dev->of_node;
+        //struct device_node *child = NULL;
 
+        struct resource *mem_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+        pr_info("Borg: mem resource: start %lli end %lli name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
+
+        struct resource *reg_resource = platform_get_resource(pdev, IORESOURCE_REG, 0);
+        pr_info("Borg: reg resource: start %lli end %lli name %s.\n", reg_resource->start, reg_resource->end, reg_resource->name);
+
+#if 0
         pr_info("Borg: for each child:");
         for_each_child_of_node(dev_node, child) {
                 if (!child) {
@@ -150,6 +157,7 @@ static int borg_probe(struct platform_device *pdev)
                         pr_info("Borg: iomap ok: %p.", iomap_ret);
                 }
         }
+#endif
 	pr_info("Borg probe ok!");
         return 0;
 err:
