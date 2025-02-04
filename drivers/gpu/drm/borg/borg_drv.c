@@ -67,17 +67,6 @@ static const struct drm_driver borg_drm_driver = {
         .fops                   = &borg_fops,
 };
 
-#define BORG_TEST1      0x4000
-#define BORG_TEST2      0x4020
-
-static const struct regmap_config borg_regmap_config = {
-        .reg_bits       = 32,
-        .val_bits       = 32,
-        .reg_stride     = 4,
-        .max_register   = BORG_TEST2,
-        .name           = "borg-regmap",
-};
-
 static int borg_probe(struct platform_device *pdev)
 {
 	pr_info("Borg probe 1!");
@@ -88,94 +77,54 @@ static int borg_probe(struct platform_device *pdev)
 
         int ret = 0;
 
-        borg_dev = devm_drm_dev_alloc(dev, &borg_drm_driver,
-                                     struct borg_device, base);
+        borg_dev = devm_drm_dev_alloc(dev, &borg_drm_driver, struct borg_device, base);
         if (IS_ERR(borg_dev)) {
 	        pr_info("Borg dev alloc failed!");
                 return -ENOMEM;
         }
 	pr_info("Borg dev alloc succeeded!");
-
         drm = &borg_dev->base;
+
+        struct resource *mem_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+        if (!mem_resource) {
+                pr_info("Borg: platform_get_resource failed.");
+                return -EINVAL;
+        }
+        pr_info("Borg: mem resource: start %lli end %lli name %s.\n",
+                        mem_resource->start, mem_resource->end, mem_resource->name);
+
+        struct resource *mem = devm_request_mem_region(&pdev->dev, mem_resource->start,
+                        resource_size(mem_resource), borg_drm_driver.name);
+        if (!mem) {
+                pr_info("Borg: Failed requst mem region, trying raw");
+                // Try raw resource
+                mem = mem_resource;
+        }
+
+        borg_dev->regs = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
+        if (!borg_dev->regs) {
+                pr_info("Borg: devm_ioremap failed.");
+                return -ENOMEM;
+        }
+        pr_info("Borg: regs: %p.\n", borg_dev->regs);
+
+        u64 test1 = readq(borg_dev->regs + 0x00);
+        pr_info("Borg: reg0: %lli.\n", test1);
+        u64 test2 = readq(borg_dev->regs + 0x20);
+        pr_info("Borg: reg0: %lli.\n", test2);
+
         platform_set_drvdata(pdev, drm);
 	pr_info("Borg set drvdata ok!");
 
         ret = drm_dev_register(drm, 0);
-        if (ret < 0) {
+        if (ret != 0) {
 	        pr_info("Borg drm_dev_register failed!");
-                goto err;
-        }
-#if 0
-        void __iomem *mmio = devm_platform_ioremap_resource(pdev, 0);
-        if (IS_ERR(mmio)) {
-                pr_info("Borg: mmio failed");
-                return PTR_ERR(mmio);
-        }
-        pr_info("Borg: mmio: %p\n", mmio);
-
-        struct regmap *regs = devm_regmap_init_mmio(dev, mmio, &borg_regmap_config);
-        if (IS_ERR(regs)) {
-                pr_info("Borg: Couldn't create regmap");
-                return PTR_ERR(regs);
-        }
-        pr_info("Borg: regs: %p\n", regs);
-
-        msleep(300);
-
-        u32 test1;
-        regmap_read(regs, BORG_TEST1, &test1);
-        //u32 test1 = ioread32(mmio + 0x4000);
-        pr_info("Borg: test1 register: %i\n", test1);
-
-        //u32 test2 = ioread32(mmio + 0x4020);
-        u32 test2;
-        regmap_read(regs, BORG_TEST2, &test2);
-        pr_info("Borg: test2 register: %i\n", test2);
-#endif
-
-        //struct device_node *dev_node = dev->of_node;
-        //struct device_node *child = NULL;
-
-        struct resource *mem_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-        if (!mem_resource) {
-                pr_info("Borg: Failed mem resource.\n");
-        } else {
-                pr_info("Borg: mem resource: start %lli end %lli name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
-
-                struct resource *mem = devm_request_mem_region(&pdev->dev, mem_resource->start, resource_size(mem_resource), "borg");
-                if (!mem) {
-                        pr_info("Borg: Failed requst mem region.\n");
-                        // Try raw resource
-                        mem = mem_resource;
-                }
-                void *base = devm_ioremap_wc(&pdev->dev, mem->start, resource_size(mem));
-                pr_info("Borg: base: %p.\n", base);
-
-                u64 reg0 = readq(base + 0x0);
-                pr_info("Borg: reg0: %lli.\n", reg0);
+                platform_set_drvdata(pdev, NULL);
+	        return ret;
         }
 
-#if 0
-        pr_info("Borg: for each child:");
-        for_each_child_of_node(dev_node, child) {
-                if (!child) {
-                        pr_info("Borg: no child, break!");
-                        break;
-                }
-                void __iomem *iomap_ret;
-                iomap_ret = devm_of_iomap(dev, dev_node, 0, NULL);
-                if (IS_ERR(iomap_ret)) {
-                        pr_info("Borg: iomap error!");
-                } else {
-                        pr_info("Borg: iomap ok: %p.", iomap_ret);
-                }
-        }
-#endif
 	pr_info("Borg probe ok!");
         return 0;
-err:
-        platform_set_drvdata(pdev, NULL);
-	return ret;
 }
 
 static void borg_remove(struct platform_device *pdev)
