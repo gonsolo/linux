@@ -153,10 +153,6 @@ static int borg_probe(struct platform_device *pdev)
 
                 u64 reg0 = readq(base + 0x0);
                 pr_info("Borg: reg0: %lli.\n", reg0);
-                u64 reg1 = readq(base + 0x4000);
-                pr_info("Borg: reg1: %lli.\n", reg1);
-                u64 reg2 = readq(base + 0x4020);
-                pr_info("Borg: reg2: %lli.\n", reg2);
         }
 
 #if 0
