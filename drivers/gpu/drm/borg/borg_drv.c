@@ -140,7 +140,7 @@ static int borg_probe(struct platform_device *pdev)
         if (!mem_resource) {
                 pr_info("Borg: Failed mem resource.\n");
         } else {
-                pr_info("Borg: mem resource: start %i end %i name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
+                pr_info("Borg: mem resource: start %lli end %lli name %s.\n", mem_resource->start, mem_resource->end, mem_resource->name);
 
                 struct resource *mem = devm_request_mem_region(&pdev->dev, mem_resource->start, resource_size(mem_resource), "borg");
                 if (!mem) {
@@ -150,6 +150,13 @@ static int borg_probe(struct platform_device *pdev)
                 }
                 void *base = devm_ioremap_wc(&pdev->dev, mem->start, resource_size(mem));
                 pr_info("Borg: base: %p.\n", base);
+
+                u64 reg0 = readq(base + 0x0);
+                pr_info("Borg: reg0: %lli.\n", reg0);
+                u64 reg1 = readq(base + 0x4000);
+                pr_info("Borg: reg1: %lli.\n", reg1);
+                u64 reg2 = readq(base + 0x4020);
+                pr_info("Borg: reg2: %lli.\n", reg2);
         }
 
 #if 0
