@@ -9,6 +9,7 @@
 
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/printk.h>
 #include <linux/regmap.h>
@@ -104,7 +105,7 @@ static int borg_probe(struct platform_device *pdev)
 	        pr_info("Borg drm_dev_register failed!");
                 goto err;
         }
-
+#if 0
         void __iomem *mmio = devm_platform_ioremap_resource(pdev, 0);
         if (IS_ERR(mmio)) {
                 pr_info("Borg: mmio failed");
@@ -130,7 +131,25 @@ static int borg_probe(struct platform_device *pdev)
         u32 test2;
         regmap_read(regs, BORG_TEST2, &test2);
         pr_info("Borg: test2 register: %i\n", test2);
+#endif
 
+        struct device_node *dev_node = dev->of_node;
+        struct device_node *child = NULL;
+
+        pr_info("Borg: for each child:");
+        for_each_child_of_node(dev_node, child) {
+                if (!child) {
+                        pr_info("Borg: no child, break!");
+                        break;
+                }
+                void __iomem *iomap_ret;
+                iomap_ret = devm_of_iomap(dev, dev_node, 0, NULL);
+                if (IS_ERR(iomap_ret)) {
+                        pr_info("Borg: iomap error!");
+                } else {
+                        pr_info("Borg: iomap ok: %p.", iomap_ret);
+                }
+        }
 	pr_info("Borg probe ok!");
         return 0;
 err:
