@@ -118,8 +118,6 @@ static int borg_probe(struct platform_device *pdev)
 
         u32 test1 = borg_gpu_read(borg_dev, BORG_TEST1);
         pr_info("Borg: test1: %i.\n", test1);
-        u32 test2 = borg_gpu_read(borg_dev, BORG_TEST2);
-        pr_info("Borg: test2: %i.\n", test2);
 
         platform_set_drvdata(pdev, drm);
 	pr_info("Borg set drvdata ok!");
