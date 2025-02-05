@@ -154,7 +154,7 @@ MODULE_DEVICE_TABLE(of, dt_match);
 
 static struct platform_driver borg_driver = {
 	.probe		= borg_probe,
-	.remove_new	= borg_remove,
+	.remove	        = borg_remove,
 	.driver		= {
 		.name	= "borg",
 		.pm	= pm_ptr(&borg_pm_ops),
