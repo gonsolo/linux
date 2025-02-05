@@ -216,7 +216,16 @@ static inline void set_mm(struct mm_struct *prev,
 	 * cpumask() until mm reset.
 	 */
 	cpumask_set_cpu(cpu, mm_cpumask(next));
-	if (static_branch_unlikely(&use_asid_allocator)) {
+
+#ifdef CONFIG_RISCV_ROCC
+	/*
+	 * Fence to wait for RoCC memory operations to finish, since
+	 * satp is shared between the processor and RoCC accelerators.
+	 */
+	mb();
+#endif
+
+        if (static_branch_unlikely(&use_asid_allocator)) {
 		set_mm_asid(next, cpu);
 	} else {
 		cpumask_clear_cpu(cpu, mm_cpumask(prev));
@@ -227,6 +236,14 @@ static inline void set_mm(struct mm_struct *prev,
 static int __init asids_init(void)
 {
 	unsigned long asid_bits, old;
+
+#ifdef CONFIG_RISCV_ROCC
+	/*
+	 * Fence to wait for RoCC memory operations to finish, since
+	 * satp is shared between the processor and RoCC accelerators.
+	 */
+	mb();
+#endif
 
 	/* Figure-out number of ASID bits in HW */
 	old = csr_read(CSR_SATP);

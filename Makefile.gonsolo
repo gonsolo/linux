@@ -1,0 +1,5 @@
+tidy:
+	sed -i 's/-fconserve-stack //g' compile_commands.json
+	sed -i 's/-fmin-function-alignment=16 //g' compile_commands.json
+	sed -i 's/-fno-allow-store-data-races //g' compile_commands.json
+	sed -i 's/-mpreferred-stack-boundary=3 //g' compile_commands.json
