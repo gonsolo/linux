@@ -28,7 +28,6 @@ static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
 	return readl(borg_dev->regs + reg);
 }
 
-
 static int
 borg_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
