@@ -49,11 +49,19 @@ borg_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_pr
         return 0;
 }
 
+static int
+borg_ioctl_submit(struct drm_device *dev, void *data, struct drm_file *file_priv)
+{
+        pr_info("Borg: submit\n");
+        return 0;
+}
+
 static const struct drm_ioctl_desc borg_ioctls[] = {
-        DRM_IOCTL_DEF_DRV(BORG_GETPARAM, borg_ioctl_getparam, DRM_RENDER_ALLOW),
-        DRM_IOCTL_DEF_DRV(BORG_VM_INIT, borg_uvmm_ioctl_vm_init, DRM_RENDER_ALLOW),
-        DRM_IOCTL_DEF_DRV(BORG_VM_BIND, borg_uvmm_ioctl_vm_bind, DRM_RENDER_ALLOW),
         DRM_IOCTL_DEF_DRV(BORG_GEM_NEW, borg_gem_ioctl_new, DRM_RENDER_ALLOW),
+        DRM_IOCTL_DEF_DRV(BORG_GETPARAM, borg_ioctl_getparam, DRM_RENDER_ALLOW),
+        DRM_IOCTL_DEF_DRV(BORG_SUBMIT, borg_ioctl_submit, DRM_RENDER_ALLOW),
+        DRM_IOCTL_DEF_DRV(BORG_VM_BIND, borg_uvmm_ioctl_vm_bind, DRM_RENDER_ALLOW),
+        DRM_IOCTL_DEF_DRV(BORG_VM_INIT, borg_uvmm_ioctl_vm_init, DRM_RENDER_ALLOW),
 };
 
 static const struct file_operations borg_fops = {
