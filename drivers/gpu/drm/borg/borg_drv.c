@@ -22,6 +22,7 @@
 
 #define BORG_TEST1      0x00
 #define BORG_KICK       0x20
+#define BORG_COMPLETED  0x40
 
 static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
 {
@@ -60,6 +61,11 @@ borg_ioctl_submit(struct drm_device *dev, void *data, struct drm_file *file_priv
         struct borg_device *borg_dev = to_borg_device(dev);
         borg_gpu_write(borg_dev, BORG_KICK, 1);
         pr_info("Borg: wrote 1 to kick\n");
+
+        while (borg_gpu_read(borg_dev, BORG_COMPLETED) != 1) {
+                pr_info("Borg: Waiting for completion.\n");
+        }
+        pr_info("Borg: Completed submit\n");
 
         return 0;
 }
