@@ -21,7 +21,6 @@
 #include "borg_uvmm.h"
 
 #define BORG_TEST1      0x00
-#define BORG_TEST2      0x20
 
 static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
 {
@@ -32,14 +31,13 @@ static int
 borg_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
         struct drm_borg_getparam *getparam = data;
+        struct borg_device *borg_dev = to_borg_device(dev);
 
         switch (getparam->param) {
         case BORG_GETPARAM_STATUS: {
-                __iomem uint32_t *addr = ioremap(0x4000, 0x0);
-                pr_info("Borg: attempting to read status\n");
-                uint64_t status = readl(addr) & 0x1;
-                pr_info("Borg: status: %lld\n", status);
-                getparam->value = status;
+                u32 test1 = borg_gpu_read(borg_dev, BORG_TEST1);
+                pr_info("Borg: status (test1): %d\n", test1);
+                getparam->value = test1;
                 break;
         }
         default:

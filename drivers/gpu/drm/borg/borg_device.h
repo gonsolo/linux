@@ -12,4 +12,9 @@ struct borg_device {
         void __iomem *regs;
 };
 
+static inline struct borg_device *to_borg_device(const struct drm_device *dev)
+{
+        return container_of(dev, struct borg_device, base);
+}
+
 #endif
