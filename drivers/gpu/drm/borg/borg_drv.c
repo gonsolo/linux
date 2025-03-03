@@ -21,10 +21,16 @@
 #include "borg_uvmm.h"
 
 #define BORG_TEST1      0x00
+#define BORG_KICK       0x20
 
 static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
 {
 	return readl(borg_dev->regs + reg);
+}
+
+static inline void borg_gpu_write(struct borg_device *borg_dev, u32 reg, u32 value)
+{
+	writel(value, borg_dev->regs + reg);
 }
 
 static int
@@ -51,6 +57,10 @@ static int
 borg_ioctl_submit(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
         pr_info("Borg: submit\n");
+        struct borg_device *borg_dev = to_borg_device(dev);
+        borg_gpu_write(borg_dev, BORG_KICK, 1);
+        pr_info("Borg: wrote 1 to kick\n");
+
         return 0;
 }
 
