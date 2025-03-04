@@ -20,9 +20,11 @@
 #include "borg_gem.h"
 #include "borg_uvmm.h"
 
-#define BORG_TEST1      0x00
-#define BORG_KICK       0x20
-#define BORG_COMPLETED  0x40
+#define BORG_TEST1              0x000
+#define BORG_KICK               0x020
+#define BORG_COMPLETED          0x040
+#define BORG_SHADER_POINTER     0x060
+#define BORG_SHADER_SIZE        0X100
 
 static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
 {
@@ -59,6 +61,11 @@ borg_ioctl_submit(struct drm_device *dev, void *data, struct drm_file *file_priv
 {
         pr_info("Borg: submit\n");
         struct borg_device *borg_dev = to_borg_device(dev);
+
+        struct drm_borg_submit *args = data;
+        borg_gpu_write(borg_dev, BORG_SHADER_POINTER, args->shader_pointer);
+        borg_gpu_write(borg_dev, BORG_SHADER_SIZE, args->shader_size);
+
         borg_gpu_write(borg_dev, BORG_KICK, 1);
         pr_info("Borg: wrote 1 to kick\n");
 
