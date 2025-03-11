@@ -30,7 +30,7 @@ void __init time_init(void)
 			panic("RISC-V system with no 'timebase-frequency' in DTS\n");
 
 		of_node_put(cpu);
-		riscv_timebase = prop;
+		riscv_timebase = prop / CONFIG_RISCV_TIMEBASE_DIV;
 		of_clk_init(NULL);
 	} else {
 		status = acpi_get_table(ACPI_SIG_RHCT, 0, (struct acpi_table_header **)&rhct);
