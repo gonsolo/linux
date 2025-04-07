@@ -98,7 +98,6 @@ static const struct drm_driver borg_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_RENDER,
 	.name = "borg",
 	.desc = "borg DRM",
-	.date = "20250128",
 	.major = 0,
 	.minor = 0,
 	.patchlevel = 1,
