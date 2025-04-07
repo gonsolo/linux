@@ -4113,6 +4113,13 @@ F:	include/net/bond*
 F:	include/uapi/linux/if_bonding.h
 F:	tools/testing/selftests/drivers/net/bonding/
 
+BORG DRIVER
+M:	Andreas Wendleder <andreas.wendleder@gmail.com>
+S:	Maintained
+F:	Makefile.gonsolo
+F:	drivers/gpu/drm/borg
+F:	include/uapi/drm/borg_drm.h
+
 BOSCH SENSORTEC BMA400 ACCELEROMETER IIO DRIVER
 M:	Dan Robertson <dan@dlrobertson.com>
 L:	linux-iio@vger.kernel.org

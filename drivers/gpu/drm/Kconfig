@@ -97,7 +97,7 @@ config DRM_KUNIT_TEST
 	  If in doubt, say "N".
 
 config DRM_KMS_HELPER
-	tristate
+	bool
 	depends on DRM
 	select FB_CORE if DRM_FBDEV_EMULATION
 	help
@@ -335,6 +335,8 @@ source "drivers/gpu/drm/radeon/Kconfig"
 source "drivers/gpu/drm/amd/amdgpu/Kconfig"
 
 source "drivers/gpu/drm/nouveau/Kconfig"
+
+source "drivers/gpu/drm/borg/Kconfig"
 
 source "drivers/gpu/drm/i915/Kconfig"
 
