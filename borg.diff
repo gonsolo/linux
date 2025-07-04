@@ -1,0 +1,811 @@
+diff --git a/.gitignore b/.gitignore
+index 5937c74d3dc1..2c091c71aa83 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -180,3 +180,6 @@ sphinx_*/
+ 
+ # Rust analyzer configuration
+ /rust-project.json
++
++# Borg
++/*.plist
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 00e94bec401e..fc6133e60784 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4113,6 +4113,13 @@ F:	include/net/bond*
+ F:	include/uapi/linux/if_bonding.h
+ F:	tools/testing/selftests/drivers/net/bonding/
+ 
++BORG DRIVER
++M:	Andreas Wendleder <andreas.wendleder@gmail.com>
++S:	Maintained
++F:	Makefile.gonsolo
++F:	drivers/gpu/drm/borg
++F:	include/uapi/drm/borg_drm.h
++
+ BOSCH SENSORTEC BMA400 ACCELEROMETER IIO DRIVER
+ M:	Dan Robertson <dan@dlrobertson.com>
+ L:	linux-iio@vger.kernel.org
+diff --git a/Makefile.gonsolo b/Makefile.gonsolo
+new file mode 100644
+index 000000000000..e6476d4d9a76
+--- /dev/null
++++ b/Makefile.gonsolo
+@@ -0,0 +1,5 @@
++tidy:
++	sed -i 's/-fconserve-stack //g' compile_commands.json
++	sed -i 's/-fmin-function-alignment=16 //g' compile_commands.json
++	sed -i 's/-fno-allow-store-data-races //g' compile_commands.json
++	sed -i 's/-mpreferred-stack-boundary=3 //g' compile_commands.json
+diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
+index 5d63abc499ce..4aa08bb0b7e1 100644
+--- a/arch/riscv/Kconfig
++++ b/arch/riscv/Kconfig
+@@ -980,6 +980,12 @@ endchoice
+ 
+ source "arch/riscv/Kconfig.vendor"
+ 
++config RISCV_ROCC
++	bool "Enable RoCC instructions"
++	default y
++	help
++	Say N here if you want to disable all non-standard custom instructions
++
+ endmenu # "Platform type"
+ 
+ menu "Kernel features"
+@@ -1107,6 +1113,29 @@ config RANDOMIZE_BASE
+ 
+           If unsure, say N.
+ 
++config RISCV_TIMEBASE_DIV
++	int "RISC-V timebase divisor"
++	default 1
++	help
++	  Force the kernel to assume that the mtime RTC frequency is an
++	  integer factor slower than reported by the platform.
++	  This makes simulated systems more responsive to user interaction.
++
++config OVERRIDE_RNG_ENTROPY
++        bool "Override rng init entropy with OVERRIDE_RNG_ENTROPY_VALUE"
++        default n
++        help
++          Override the random number generator init entropy during early boot
++          See drivers/char/random.c:random_init_early()
++          This prevents apps from blocking on the rng.
++
++config OVERRIDE_RNG_ENTROPY_VALUE
++        int "Value for rng init entropy"
++        default 256
++        depends on OVERRIDE_RNG_ENTROPY
++        help
++          Default: 256, the minimum required threshold per drivers/char/random.c to initialize the rng
++
+ endmenu # "Kernel features"
+ 
+ menu "Boot options"
+diff --git a/arch/riscv/kernel/process.c b/arch/riscv/kernel/process.c
+index 7c244de77180..9c5c2c7db546 100644
+--- a/arch/riscv/kernel/process.c
++++ b/arch/riscv/kernel/process.c
+@@ -141,6 +141,9 @@ void start_thread(struct pt_regs *regs, unsigned long pc,
+ 	unsigned long sp)
+ {
+ 	regs->status = SR_PIE;
++#ifdef CONFIG_RISCV_ROCC
++	regs->status |= SR_XS_INITIAL;
++#endif
+ 	if (has_fpu()) {
+ 		regs->status |= SR_FS_INITIAL;
+ 		/*
+diff --git a/arch/riscv/kernel/time.c b/arch/riscv/kernel/time.c
+index ba3477197789..7f7312eba08d 100644
+--- a/arch/riscv/kernel/time.c
++++ b/arch/riscv/kernel/time.c
+@@ -30,7 +30,7 @@ void __init time_init(void)
+ 			panic("RISC-V system with no 'timebase-frequency' in DTS\n");
+ 
+ 		of_node_put(cpu);
+-		riscv_timebase = prop;
++		riscv_timebase = prop / CONFIG_RISCV_TIMEBASE_DIV;
+ 		of_clk_init(NULL);
+ 	} else {
+ 		status = acpi_get_table(ACPI_SIG_RHCT, 0, (struct acpi_table_header **)&rhct);
+diff --git a/arch/riscv/mm/context.c b/arch/riscv/mm/context.c
+index 4abe3de23225..75292c8b782d 100644
+--- a/arch/riscv/mm/context.c
++++ b/arch/riscv/mm/context.c
+@@ -216,6 +216,15 @@ static inline void set_mm(struct mm_struct *prev,
+ 	 * cpumask() until mm reset.
+ 	 */
+ 	cpumask_set_cpu(cpu, mm_cpumask(next));
++
++#ifdef CONFIG_RISCV_ROCC
++	/*
++	 * Fence to wait for RoCC memory operations to finish, since
++	 * satp is shared between the processor and RoCC accelerators.
++	 */
++	mb();
++#endif
++
+ 	if (static_branch_unlikely(&use_asid_allocator)) {
+ 		set_mm_asid(next, cpu);
+ 	} else {
+@@ -228,6 +237,14 @@ static int __init asids_init(void)
+ {
+ 	unsigned long asid_bits, old;
+ 
++#ifdef CONFIG_RISCV_ROCC
++	/*
++	 * Fence to wait for RoCC memory operations to finish, since
++	 * satp is shared between the processor and RoCC accelerators.
++	 */
++	mb();
++#endif
++
+ 	/* Figure-out number of ASID bits in HW */
+ 	old = csr_read(CSR_SATP);
+ 	asid_bits = old | (SATP_ASID_MASK << SATP_ASID_SHIFT);
+diff --git a/drivers/char/random.c b/drivers/char/random.c
+index 2581186fa61b..453f053965e4 100644
+--- a/drivers/char/random.c
++++ b/drivers/char/random.c
+@@ -864,6 +864,10 @@ static struct notifier_block pm_notifier = { .notifier_call = random_pm_notifica
+  */
+ void __init random_init_early(const char *command_line)
+ {
++#ifdef CONFIG_OVERRIDE_RNG_ENTROPY
++	_credit_init_bits(CONFIG_OVERRIDE_RNG_ENTROPY_VALUE);
++	pr_notice("overriding entropy value\n");
++#else
+ 	unsigned long entropy[BLAKE2S_BLOCK_SIZE / sizeof(long)];
+ 	size_t i, longs, arch_bits;
+ 
+@@ -897,6 +901,7 @@ void __init random_init_early(const char *command_line)
+ 		crng_reseed(NULL);
+ 	else if (trust_cpu)
+ 		_credit_init_bits(arch_bits);
++#endif
+ }
+ 
+ /*
+diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+index fbef3f471bd0..383a238eee01 100644
+--- a/drivers/gpu/drm/Kconfig
++++ b/drivers/gpu/drm/Kconfig
+@@ -97,7 +97,7 @@ config DRM_KUNIT_TEST
+ 	  If in doubt, say "N".
+ 
+ config DRM_KMS_HELPER
+-	tristate
++	bool
+ 	depends on DRM
+ 	select FB_CORE if DRM_FBDEV_EMULATION
+ 	help
+@@ -336,6 +336,8 @@ source "drivers/gpu/drm/amd/amdgpu/Kconfig"
+ 
+ source "drivers/gpu/drm/nouveau/Kconfig"
+ 
++source "drivers/gpu/drm/borg/Kconfig"
++
+ source "drivers/gpu/drm/i915/Kconfig"
+ 
+ source "drivers/gpu/drm/xe/Kconfig"
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 19fb370fbc56..bad3f10a89f7 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -175,9 +175,10 @@ obj-$(CONFIG_DRM_VC4)  += vc4/
+ obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
+ obj-$(CONFIG_DRM_VGEM)	+= vgem/
+ obj-$(CONFIG_DRM_VKMS)	+= vkms/
+-obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+-obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+-obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
++obj-$(CONFIG_DRM_NOUVEAU) += nouveau/
++obj-$(CONFIG_DRM_BORG) += borg/
++obj-$(CONFIG_DRM_EXYNOS) += exynos/
++obj-$(CONFIG_DRM_ROCKCHIP) += rockchip/
+ obj-$(CONFIG_DRM_GMA500) += gma500/
+ obj-$(CONFIG_DRM_UDL) += udl/
+ obj-$(CONFIG_DRM_AST) += ast/
+diff --git a/drivers/gpu/drm/borg/Kconfig b/drivers/gpu/drm/borg/Kconfig
+new file mode 100644
+index 000000000000..569d4522193d
+--- /dev/null
++++ b/drivers/gpu/drm/borg/Kconfig
+@@ -0,0 +1,8 @@
++# SPDX-License-Identifier: GPL-2.0-only
++config DRM_BORG
++	tristate "Borg Graphics cards"
++	depends on DRM
++	default y
++        select DRM_GEM_SHMEM_HELPER
++	help
++	  Choose this option for open-source Borg Graphics support.
+diff --git a/drivers/gpu/drm/borg/Makefile b/drivers/gpu/drm/borg/Makefile
+new file mode 100644
+index 000000000000..c57bc5fa4a0a
+--- /dev/null
++++ b/drivers/gpu/drm/borg/Makefile
+@@ -0,0 +1,9 @@
++# SPDX-License-Identifier: GPL-2.0
++
++borg-y := \
++	borg_device.o \
++	borg_drv.o \
++	borg_gem.o \
++	borg_uvmm.o
++
++obj-$(CONFIG_DRM_BORG) += borg.o
+diff --git a/drivers/gpu/drm/borg/borg_device.c b/drivers/gpu/drm/borg/borg_device.c
+new file mode 100644
+index 000000000000..ab04ab01a49e
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_device.c
+@@ -0,0 +1,33 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#include <linux/device.h>
++#include <linux/pm.h>
++
++static int borg_device_runtime_resume(struct device *dev)
++{
++	return 0;
++}
++
++static int borg_device_runtime_suspend(struct device *dev)
++{
++	return 0;
++}
++
++static int borg_device_resume(struct device *dev)
++{
++	return 0;
++}
++
++static int borg_device_suspend(struct device *dev)
++{
++	return 0;
++}
++
++EXPORT_GPL_DEV_PM_OPS(borg_pm_ops) = {
++	RUNTIME_PM_OPS(borg_device_runtime_suspend, borg_device_runtime_resume,
++		       NULL)
++		SYSTEM_SLEEP_PM_OPS(borg_device_suspend, borg_device_resume)
++};
+diff --git a/drivers/gpu/drm/borg/borg_device.h b/drivers/gpu/drm/borg/borg_device.h
+new file mode 100644
+index 000000000000..428bd09b0372
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_device.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#ifndef __BORG_DEVICE_H__
++#define __BORG_DEVICE_H__
++
++#include <drm/drm_device.h>
++
++extern const struct dev_pm_ops borg_pm_ops;
++
++struct borg_device {
++	struct drm_device base;
++	void __iomem *regs;
++};
++
++static inline struct borg_device *to_borg_device(const struct drm_device *dev)
++{
++	return container_of(dev, struct borg_device, base);
++}
++
++#endif
+diff --git a/drivers/gpu/drm/borg/borg_drv.c b/drivers/gpu/drm/borg/borg_drv.c
+new file mode 100644
+index 000000000000..1933f1bea14e
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_drv.c
+@@ -0,0 +1,202 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#include <drm/drm_drv.h>
++#include <drm/drm_file.h>
++#include <drm/drm_gem.h>
++#include <drm/drm_ioctl.h>
++
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/regmap.h>
++
++#include <uapi/drm/borg_drm.h>
++
++#include "borg_device.h"
++#include "borg_gem.h"
++#include "borg_uvmm.h"
++
++#define BORG_TEST1 0x000
++#define BORG_KICK 0x020
++#define BORG_COMPLETED 0x040
++#define BORG_SHADER_POINTER 0x060
++#define BORG_SHADER_SIZE 0X100
++
++static inline u32 borg_gpu_read(struct borg_device *borg_dev, u32 reg)
++{
++	return readl(borg_dev->regs + reg);
++}
++
++static inline void borg_gpu_write(struct borg_device *borg_dev, u32 reg,
++				  u32 value)
++{
++	writel(value, borg_dev->regs + reg);
++}
++
++static int borg_ioctl_getparam(struct drm_device *dev, void *data,
++			       struct drm_file *file_priv)
++{
++	struct drm_borg_getparam *getparam = data;
++	struct borg_device *borg_dev = to_borg_device(dev);
++	u32 test1;
++
++	switch (getparam->param) {
++	case BORG_GETPARAM_STATUS:
++		test1 = borg_gpu_read(borg_dev, BORG_TEST1);
++		pr_info("Borg: status (test1): %d\n", test1);
++		getparam->value = test1;
++		break;
++	default:
++		pr_info("Borg: unknown parameter %lld\n", getparam->param);
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static int borg_ioctl_submit(struct drm_device *dev, void *data,
++			     struct drm_file *file_priv)
++{
++	pr_info("Borg: submit\n");
++	struct borg_device *borg_dev = to_borg_device(dev);
++	struct drm_borg_submit *args = data;
++
++	borg_gpu_write(borg_dev, BORG_SHADER_POINTER, args->shader_pointer);
++	borg_gpu_write(borg_dev, BORG_SHADER_SIZE, args->shader_size);
++
++	borg_gpu_write(borg_dev, BORG_KICK, 1);
++	pr_info("Borg: wrote 1 to kick\n");
++
++	while (borg_gpu_read(borg_dev, BORG_COMPLETED) != 1)
++		pr_info("Borg: Waiting for completion.\n");
++	pr_info("Borg: Completed submit\n");
++
++	return 0;
++}
++
++static const struct drm_ioctl_desc borg_ioctls[] = {
++	DRM_IOCTL_DEF_DRV(BORG_GEM_NEW, borg_gem_ioctl_new, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF_DRV(BORG_GETPARAM, borg_ioctl_getparam, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF_DRV(BORG_SUBMIT, borg_ioctl_submit, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF_DRV(BORG_VM_BIND, borg_uvmm_ioctl_vm_bind,
++			  DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF_DRV(BORG_VM_INIT, borg_uvmm_ioctl_vm_init,
++			  DRM_RENDER_ALLOW),
++};
++
++static const struct file_operations borg_fops = {
++	.owner = THIS_MODULE,
++	DRM_GEM_FOPS,
++	.show_fdinfo = drm_show_fdinfo,
++};
++
++static const struct drm_driver borg_drm_driver = {
++	.driver_features = DRIVER_GEM | DRIVER_RENDER,
++	.name = "borg",
++	.desc = "borg DRM",
++	.major = 0,
++	.minor = 0,
++	.patchlevel = 1,
++	.ioctls = borg_ioctls,
++	.num_ioctls = ARRAY_SIZE(borg_ioctls),
++	.fops = &borg_fops,
++};
++
++static int borg_probe(struct platform_device *pdev)
++{
++	pr_info("Borg probe 1!");
++
++	struct borg_device *borg_dev;
++	struct drm_device *drm;
++	struct device *dev = &pdev->dev;
++
++	int ret = 0;
++
++	borg_dev = devm_drm_dev_alloc(dev, &borg_drm_driver, struct borg_device,
++				      base);
++	if (IS_ERR(borg_dev)) {
++		pr_info("Borg dev alloc failed!");
++		return -ENOMEM;
++	}
++	pr_info("Borg dev alloc succeeded!");
++	drm = &borg_dev->base;
++
++	struct resource *mem_resource =
++		platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem_resource) {
++		pr_info("Borg: platform_get_resource failed.");
++		return -EINVAL;
++	}
++	pr_info("Borg: mem resource: start %lli end %lli name %s.\n",
++		mem_resource->start, mem_resource->end, mem_resource->name);
++
++	struct resource *mem = devm_request_mem_region(
++		&pdev->dev, mem_resource->start, resource_size(mem_resource),
++		borg_drm_driver.name);
++	if (!mem) {
++		pr_info("Borg: Failed request mem region, trying raw");
++		// Try raw resource
++		mem = mem_resource;
++	}
++
++	borg_dev->regs =
++		devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
++	if (!borg_dev->regs) {
++		pr_info("Borg: devm_ioremap failed.");
++		return -ENOMEM;
++	}
++	pr_info("Borg: regs: %p.\n", borg_dev->regs);
++
++	u32 test1 = borg_gpu_read(borg_dev, BORG_TEST1);
++
++	pr_info("Borg: test1: %i.\n", test1);
++
++	platform_set_drvdata(pdev, drm);
++	pr_info("Borg set drvdata ok!");
++
++	ret = drm_dev_register(drm, 0);
++	if (ret != 0) {
++		pr_info("Borg drm_dev_register failed!");
++		platform_set_drvdata(pdev, NULL);
++		return ret;
++	}
++
++	pr_info("Borg probe ok!");
++	return 0;
++}
++
++static void borg_remove(struct platform_device *pdev)
++{
++}
++
++struct borg_compatible {};
++
++static const struct borg_compatible default_data = {};
++
++static const struct of_device_id dt_match[] = { {
++							.compatible =
++								"borg,borg-1",
++							.data = &default_data,
++						},
++						{} };
++
++MODULE_DEVICE_TABLE(of, dt_match);
++
++static struct platform_driver borg_driver = {
++	.probe		= borg_probe,
++	.remove	        = borg_remove,
++	.driver		= {
++		.name	= "borg",
++		.pm	= pm_ptr(&borg_pm_ops),
++		.of_match_table = dt_match,
++	},
++};
++module_platform_driver(borg_driver);
++
++MODULE_AUTHOR("Andreas Wendleder");
++MODULE_DESCRIPTION("Borg DRM Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpu/drm/borg/borg_drv.h b/drivers/gpu/drm/borg/borg_drv.h
+new file mode 100644
+index 000000000000..914f04a180b1
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_drv.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#ifndef __BORG_DRV_H__
++#define __BORG_DRV_H__
++
++#include <drm/drm_file.h>
++
++#include <linux/platform_device.h>
++
++#define DRIVER_AUTHOR "Andreas Wendleder"
++#define DRIVER_EMAIL "andreas.wendleder@gmail.com"
++
++#define DRIVER_NAME "borg"
++#define DRIVER_DESC "Borg"
++#define DRIVER_DATE "20250128"
++
++#define DRIVER_MAJOR 0
++#define DRIVER_MINOR 0
++#define DRIVER_PATCHLEVEL 1
++
++struct drm_device *borg_platform_device_create(struct platform_device *pdev);
++
++#endif
+diff --git a/drivers/gpu/drm/borg/borg_gem.c b/drivers/gpu/drm/borg/borg_gem.c
+new file mode 100644
+index 000000000000..aa1cb22861bc
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_gem.c
+@@ -0,0 +1,56 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#include <drm/drm_device.h>
++#include <drm/drm_file.h>
++#include <drm/drm_gem.h>
++
++#include <linux/types.h>
++
++#include <uapi/drm/borg_drm.h>
++
++#include "borg_gem.h"
++
++struct borg_gem_object *borg_gem_create(struct drm_device *dev, u64 size)
++{
++	struct drm_gem_shmem_object *shmem;
++	struct borg_gem_object *bo;
++
++	shmem = drm_gem_shmem_create(dev, size);
++	if (IS_ERR(shmem))
++		return ERR_CAST(shmem);
++
++	bo = to_borg_bo(&shmem->base);
++
++	return bo;
++}
++
++int borg_gem_ioctl_new(struct drm_device *dev, void *data,
++		       struct drm_file *file_priv)
++{
++	//pr_info("Borg: borg_gem_ioctl_new!");
++	struct drm_borg_gem_new *req = data;
++	struct borg_gem_object *bo = NULL;
++	int ret = -1;
++
++	bo = borg_gem_create(dev, req->info.size);
++	if (IS_ERR(bo))
++		return PTR_ERR(bo);
++	//pr_info("Borg: borg_gem_create ok, bo: %p\n", bo);
++	ret = drm_gem_handle_create(file_priv, &bo->base.base,
++				    &req->info.handle);
++	if (ret)
++		goto out;
++	//pr_info("Borg: drm_gem_handle_create ok");
++
++	ret = drm_gem_create_mmap_offset(&bo->base.base);
++	if (ret == 0)
++		req->info.map_handle =
++			drm_vma_node_offset_addr(&bo->base.base.vma_node);
++out:
++	drm_gem_object_put(&bo->base.base);
++	//pr_info("Borg: borg_gem_ioctl_new returns ret: %i\n", ret);
++	return ret;
++}
+diff --git a/drivers/gpu/drm/borg/borg_gem.h b/drivers/gpu/drm/borg/borg_gem.h
+new file mode 100644
+index 000000000000..9506d6dd9f94
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_gem.h
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#ifndef __BORG_GEM_H__
++#define __BORG_GEM_H__
++
++#include <drm/drm_device.h>
++#include <drm/drm_gem.h>
++#include <drm/drm_gem_shmem_helper.h>
++
++#include <linux/container_of.h>
++#include <linux/types.h>
++
++struct borg_gem_object {
++	struct drm_gem_shmem_object base;
++};
++
++extern struct borg_gem_object *borg_gem_create(struct drm_device *dev, u64 size);
++extern int borg_gem_ioctl_new(struct drm_device *dev, void *vp, struct drm_file *file);
++
++static inline struct borg_gem_object *to_borg_bo(struct drm_gem_object *obj)
++{
++	return container_of(to_drm_gem_shmem_obj(obj), struct borg_gem_object,
++			    base);
++}
++
++#endif
+diff --git a/drivers/gpu/drm/borg/borg_ioctl.h b/drivers/gpu/drm/borg/borg_ioctl.h
+new file mode 100644
+index 000000000000..1ae429247b1e
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_ioctl.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#ifndef __BORG_IOCTL_H__
++#define __BORG_IOCTL_H__
++
++//long borg_drm_ioctl(struct file *, unsigned int cmd, unsigned long arg);
++
++#endif
+diff --git a/drivers/gpu/drm/borg/borg_uvmm.c b/drivers/gpu/drm/borg/borg_uvmm.c
+new file mode 100644
+index 000000000000..093c0298d1ee
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_uvmm.c
+@@ -0,0 +1,23 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++#include <drm/drm_device.h>
++#include <drm/drm_file.h>
++
++#include "borg_uvmm.h"
++
++int borg_uvmm_ioctl_vm_bind(struct drm_device *dev, void *data,
++			    struct drm_file *file_priv)
++{
++	// TODO
++	return 0;
++}
++
++int borg_uvmm_ioctl_vm_init(struct drm_device *dev, void *data,
++			    struct drm_file *file_priv)
++{
++	// TODO
++	return 0;
++}
+diff --git a/drivers/gpu/drm/borg/borg_uvmm.h b/drivers/gpu/drm/borg/borg_uvmm.h
+new file mode 100644
+index 000000000000..8f9f9fafa2f5
+--- /dev/null
++++ b/drivers/gpu/drm/borg/borg_uvmm.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-2025 Andreas Wendleder
++ */
++
++int borg_uvmm_ioctl_vm_bind(struct drm_device *dev, void *data,
++			    struct drm_file *file_priv);
++int borg_uvmm_ioctl_vm_init(struct drm_device *dev, void *data,
++			    struct drm_file *file_priv);
+diff --git a/include/uapi/drm/borg_drm.h b/include/uapi/drm/borg_drm.h
+new file mode 100644
+index 000000000000..199a6ea4b084
+--- /dev/null
++++ b/include/uapi/drm/borg_drm.h
+@@ -0,0 +1,78 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright 2024-25 Andreas Wendleder
++ * All Rights Reserved.
++ */
++
++#ifndef __BORG_DRM_H__
++#define __BORG_DRM_H__
++
++#include "drm.h"
++
++#if defined(__cplusplus)
++extern "C" {
++#endif
++
++struct drm_borg_gem_info {
++	__u32 handle;
++	__u64 size;
++	__u64 map_handle;
++};
++
++struct drm_borg_gem_new {
++	struct drm_borg_gem_info info;
++};
++
++struct drm_borg_getparam {
++	__u64 param;
++	__u64 value;
++};
++
++struct drm_borg_submit {
++	__u64 dummy;
++	__u64 shader_pointer;
++	__u64 shader_size;
++};
++
++struct drm_borg_vm_bind {
++	__u32 op_count;
++	__u64 op_ptr;
++};
++
++struct drm_borg_vm_bind_op {
++	__u32 op;
++#define DRM_BORG_VM_BIND_OP_MAP 0x0
++#define DRM_BORG_VM_BIND_OP_UNMAP 0x1
++	__u64 addr;
++	__u64 range;
++};
++
++struct drm_borg_vm_init {
++	__u64 kernel_managed_addr;
++	__u64 kernel_managed_size;
++};
++
++#define DRM_BORG_SUBMIT 0x01
++#define DRM_BORG_GEM_NEW 0x02
++#define DRM_BORG_GETPARAM 0x03
++#define DRM_BORG_VM_BIND 0x04
++#define DRM_BORG_VM_INIT 0x05
++
++#define DRM_IOCTL_BORG_SUBMIT \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_BORG_SUBMIT, struct drm_borg_submit)
++#define DRM_IOCTL_BORG_GEM_NEW \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_BORG_GEM_NEW, struct drm_borg_gem_new)
++#define DRM_IOCTL_BORG_GETPARAM \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_BORG_GETPARAM, struct drm_borg_getparam)
++#define DRM_IOCTL_BORG_VM_BIND \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_BORG_VM_BIND, struct drm_borg_vm_bind)
++#define DRM_IOCTL_BORG_VM_INIT \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_BORG_VM_INIT, struct drm_borg_vm_init)
++
++#define BORG_GETPARAM_STATUS 0
++
++#if defined(__cplusplus)
++}
++#endif
++
++#endif
+diff --git a/scripts/spdxcheck.py b/scripts/spdxcheck.py
+index 8d608f61bf37..eba808cbaeeb 100755
+--- a/scripts/spdxcheck.py
++++ b/scripts/spdxcheck.py
+@@ -349,11 +349,11 @@ if __name__ == '__main__':
+ 
+     try:
+         # Use git to get the valid license expressions
+-        repo = git.Repo(os.getcwd())
+-        assert not repo.bare
++        with git.Repo(os.getcwd()) as repo:
++            assert not repo.bare
+ 
+-        # Initialize SPDX data
+-        spdx = read_spdxdata(repo)
++            # Initialize SPDX data
++            spdx = read_spdxdata(repo)
+ 
+         # Initialize the parser
+         parser = id_parser(spdx)
